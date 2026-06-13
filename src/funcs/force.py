@@ -55,6 +55,7 @@ def generar_particiones_multi_k(
     particiones_n = list(generar_k_particiones_conjunto(n_vars, k_n))
     
     return product(particiones_m, particiones_n)
+
 def generar_candidatos(n_vars: int):
     """
     Genera todas las combinaciones posibles para condicionamiento.

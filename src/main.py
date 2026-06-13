@@ -4,10 +4,10 @@ import pandas as pd
 from datetime import datetime
 import openpyxl
 from src.controllers.manager import Manager
-from src.models.kqnodes.kqnodes import KQNodes
+from src.strategies.kqnodes.kqnodes import KQNodes
 from src.strategies.q_nodes import QNodes
 from src.strategies.force import BruteForce
-from src.models.kqnodes.profilter import KQNodesProfiler
+# from src.models.kqnodes.profilter import KQNodesProfiler
 
 
 def obtener_timestamp():
@@ -34,9 +34,9 @@ def iniciar():
     # =========================================================================
     # CONFIGURACIÓN DINÁMICA: Cambia esto según la hoja que vayas a procesar
     # =========================================================================
-    nombre_hoja = "25A-Elementos"  # Pestaña del Excel
+    nombre_hoja = "10A-Elementos"  # Pestaña del Excel
     LONGITUD_ELEMENTOS = (
-        25  # Cantidad de nodos (10 para ABCDEFGHIJ, 15 para ABCDEFGHIJKLMNO)
+        10 #Cantidad de nodos (10 para ABCDEFGHIJ, 15 para ABCDEFGHIJKLMNO)
     )   
     # =========================================================================
 
@@ -81,8 +81,8 @@ def iniciar():
     mpt = gestor_redes.cargar_red()
 
     print(f"[{obtener_timestamp()}] 🧠 Inicializando Analizador de (KQNodes)...")
-    analizador_bf = KQNodes(mpt)
-    KQNodesProfiler.wrap(analizador_bf)
+    analizador_bf = BruteForce(mpt)
+    # KQNodesProfiler.wrap(analizador_bf)
     
     print(f"\n[{obtener_timestamp()}] 🔍 Procesando e inyectando resultados...")
     print("=" * 80)
@@ -119,7 +119,7 @@ def iniciar():
         # EJECUCION ###################
         tiempo_inicio = time.time()
         try:
-            analizador_bf.reset_estado()
+            # analizador_bf.reset_estado()
             sia_cero = analizador_bf.aplicar_estrategia_k(
                 estado_inicial, 
                 condiciones, 
@@ -168,7 +168,7 @@ def iniciar():
 
     wb.close()
     print(f"[{obtener_timestamp()}] 📁 Proceso terminado.")
-    KQNodesProfiler.report()
+    # KQNodesProfiler.report()
 
 
 if __name__ == "__main__":
