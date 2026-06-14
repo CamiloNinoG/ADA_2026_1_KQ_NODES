@@ -95,10 +95,10 @@ class KQNodesProfiler:
         # Parche especial: trackear cache hits en funcion_submodular
         cls._patch_cache_tracking(instance)
 
-        print("✅ KQNodesProfiler activo — métodos instrumentados:")
+        # print("✅ KQNodesProfiler activo — métodos instrumentados:")
         for m in cls._TARGET_METHODS:
             status = "✓" if hasattr(instance, m) else "✗ (no encontrado)"
-            print(f"   {status} {m}")
+            # print(f"   {status} {m}")
 
     @classmethod
     def _make_wrapper(cls, name: str, fn: Callable) -> Callable:
@@ -233,17 +233,6 @@ class KQNodesProfiler:
                     break
             else:
                 print(f"  💡 Revisar manualmente '{top_name}'")
-
-        # ── Resumen de complejidad ────────────────────────────────────────────
-        print()
-        print("  📐 COMPLEJIDAD ESPERADA CON 25 NODOS (50 vértices)")
-        print("  " + "-" * 50)
-        print("  algorithm()         : O(n³) ≈ 125,000 ops por ejecución")
-        print("  _generate_k_cuts()  : O(C(2n-2, k-1)) — crece rápido con k")
-        print(f"  C(48, 2) = 1,128   C(48, 3) = 17,296   C(48, 4) = 194,580")
-        print("  ⚠️  Para k=5 con n=25: considera limitar internal nodes o usar beam search")
-        print()
-        print("═" * 70)
 
     @classmethod
     def reset(cls) -> None:

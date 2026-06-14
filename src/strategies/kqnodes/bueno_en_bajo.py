@@ -277,7 +277,7 @@ class KQNodes(QNodes):
     def _generar_pool_candidatos(self, presente, futuro, k):
         indices_futuros = sorted(set(idx for _, idx in futuro))
         indices_presentes = sorted(set(idx for _, idx in presente))
-        n_max = max(len(indices_futuros), len(indices_presentes))
+        n = len(indices_futuros)
 
         map_effect = {idx: (EFFECT, idx) for idx in indices_futuros}
         map_actual = {idx: (ACTUAL, idx) for idx in indices_presentes}
@@ -306,7 +306,7 @@ class KQNodes(QNodes):
         # Q solo para sistemas pequeños donde aporta sin OOM
         parts_futuros = []
         parts_presentes = []
-        if n_max < 23:
+        if n < 23:
             parts_futuros = self._q_particiones(indices_futuros, k)
             parts_presentes = self._q_particiones(indices_presentes, k)
             for p_alc in parts_futuros:
@@ -331,17 +331,7 @@ class KQNodes(QNodes):
             registrar(grupos_f, grupos_p)
 
         # Tope adaptativo: menos candidatos = menos llamadas a bipartir = menos RAM
-        if n_max >= 25:
-            tope = 1
-        elif n_max >= 22:
-            tope = 3
-        elif n_max >= 20:
-            tope = 8
-        elif n_max >= 15:
-            tope = 50
-        else:
-            tope = 50
-        print("TOPE:", tope)
+        tope = 10 if n >= 20 else (25 if n >= 15 else 50)
         return pool[:tope]
 
     # ====================== HELPERS ======================
@@ -391,22 +381,6 @@ class KQNodes(QNodes):
         """
         import traceback
 
-        # Obtener el número máximo de nodos en presente o futuro para determinar adaptatividad
-        n_futuros = len(self.sia_subsistema.indices_ncubos)
-        n_presentes = len(self.sia_subsistema.dims_ncubos)
-        n_max = max(n_futuros, n_presentes)
-
-        # Configuración por defecto para n_max <= 20 (Preserva el comportamiento original exacto)
-        max_pasos = 50
-        usar_reinicio = True
-        muestreo_variables = False
-
-        # Reglas adaptativas para n_max > 20 (Optimización para evitar lentitud en sistemas grandes)
-        if n_max > 20:
-            max_pasos = 1
-            usar_reinicio = False
-            muestreo_variables = True
-
         try:
             best_blocks = [list(b) for b in blocks]
             best_loss, best_dist = self._evaluate_k_partition(best_blocks)
@@ -416,19 +390,9 @@ class KQNodes(QNodes):
             for b in best_blocks:
                 elementos.extend(b)
 
-            # Si el muestreo está activo, seleccionamos un subconjunto representativo aleatorio
-            if muestreo_variables:
-                np.random.seed(42)  # Semilla fija para reproducibilidad
-                tam_muestra = max(4, n_max // 4)
-                if len(elementos) > tam_muestra:
-                    # Mezclar y tomar una muestra
-                    indices_muestra = np.random.choice(
-                        len(elementos), size=tam_muestra, replace=False
-                    )
-                    elementos = [elementos[idx] for idx in indices_muestra]
-
             mejorado = True
             paso = 0
+            max_pasos = 50  # Límite para evitar bucles infinitos en redes masivas
 
             while mejorado and paso < max_pasos:
                 mejorado = False
@@ -485,10 +449,9 @@ class KQNodes(QNodes):
                             best_dist = dist
                             best_blocks = temp_blocks
                             mejorado = True
-                            if usar_reinicio:
-                                break  # Aceptar movimiento y reiniciar el barrido
+                            break  # Aceptar movimiento y reiniciar el barrido
 
-                    if mejorado and usar_reinicio:
+                    if mejorado:
                         break
 
             return best_blocks, best_loss, best_dist
@@ -527,7 +490,6 @@ class KQNodes(QNodes):
         mecanismo: str,
         k: int = 3,
     ) -> Solution:
-        print("KQNODES ESTRATEGIA")
         """K-partición usando el árbol de fusiones del algoritmo Q."""
         inicio = time.perf_counter()
         self.sia_preparar_subsistema(estado_inicial, condicion, alcance, mecanismo)
@@ -570,11 +532,10 @@ class KQNodes(QNodes):
             best_dist = self.sia_dists_marginales
         else:
             # Aplicar refinamiento por búsqueda local (Hill Climbing)
-            if best_blocks is not None:
+            n_nodos = len(self.sia_subsistema.indices_ncubos)
+            if best_blocks is not None and n_nodos < 20:
                 print(f"   [Refinamiento] Pérdida antes: {best_loss:.6f}")
-                best_blocks, best_loss, best_dist = self._refinar_busqueda_local(
-                    best_blocks, k
-                )
+                best_blocks, best_loss, best_dist = self._refinar_busqueda_local(best_blocks, k)
                 print(f"   [Refinamiento] Pérdida después: {best_loss:.6f}")
             print(
                 f"   [Refinamiento] Pérdida después de Búsqueda Local: {best_loss:.6f}"
@@ -585,7 +546,7 @@ class KQNodes(QNodes):
             [idx for t, idx in b if t == ACTUAL] for b in best_blocks
         ]
         fmt = self.fmt_particion_multi_k(particion_alcance, particion_mecanismo)
-
+        
         # print("\n=== MEMORIAS ===")
         # print("memoria_delta:", len(self.memoria_delta))
         # print("memoria_grupo_candidato:", len(self.memoria_grupo_candidato))
@@ -646,11 +607,6 @@ class KQNodes(QNodes):
 
                 omegas_ciclo.append(deltas_ciclo[indice_mip])
                 deltas_ciclo.pop(indice_mip)
-                print("OMEGAS:", omegas_ciclo)
-                print("DELTAS:", deltas_ciclo)
-                print("PAR:", par_candidato)
-                print("----------------")
-
 
             self.memoria_grupo_candidato[
                 tuple(
