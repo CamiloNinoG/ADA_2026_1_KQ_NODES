@@ -69,6 +69,41 @@ class KQNodes(QNodes):
         return bipartir_y_emd(self, idxs_alcance, dims_mecanismo, solo_emd)
 
     def funcion_submodular_k(self, deltas, omegas):
+        """
+        Evalúa el impacto de combinar el conjunto de nodos individual delta y su agrupación con el conjunto omega, calculando la diferencia entre EMD (Earth Mover's Distance) de las configuraciones, en conclusión los nodos delta evaluados individualmente y su combinación con el conjunto omega.
+
+        El proceso se realiza en dos fases principales:
+
+        1. Evaluación Individual:
+           - Crea una copia del estado temporal del subsistema.
+           - Activa los nodos delta en su tiempo correspondiente (presente/futuro).
+           - Si el delta ya fue evaluado antes, recupera su EMD y distribución marginal de memoria
+           - Si no, ha de:
+             * Identificar dimensiones activas en presente y futuro.
+             * Realiza bipartición del subsistema con esas dimensiones.
+             * Calcular la distribución marginal y EMD respecto al subsistema.
+             * Guarda resultados en memoria para seguro un uso futuro.
+
+        2. Evaluación Combinada:
+           - Sobre la misma copia temporal, activa también los nodos omega.
+           - Calcula dimensiones activas totales (delta + omega).
+           - Realiza bipartición del subsistema completo.
+           - Obtiene EMD de la combinación.
+
+        Args:
+            deltas: Un nodo individual (tupla) o grupo de nodos (lista de tuplas)
+                   donde cada tupla está identificada por su (tiempo, índice), sea el tiempo t_0 identificado como 0, t_1 como 1 y, el índice hace referencia a las variables/dimensiones habilitadas para operaciones de substracción/marginalización sobre el subsistema, tal que genere la partición.
+            omegas: Lista de nodos ya agrupados, puede contener tuplas individuales
+                   o listas de tuplas para grupos formados por los pares candidatos o más uniones entre sí (grupos candidatos).
+
+        Returns:
+            tuple: (
+                EMD de la combinación omega y delta,
+                EMD del delta individual,
+                Distribución marginal del delta individual
+            )
+            Esto lo hice así para hacer almacenamiento externo de la emd individual y su distribución marginal en las particiones candidatas.
+        """
         return funcion_submodular_k(self, deltas, omegas)
 
     # ====================== BÚSQUEDA Y CANDIDATOS (delegada) ======================
@@ -129,7 +164,39 @@ class KQNodes(QNodes):
         mecanismo: str,
         k: int = 3,
     ) -> Solution:
-        """K-partición usando el árbol de fusiones del algoritmo Q."""
+        """
+        Ejecuta la estrategia principal para encontrar la k-partición óptima del subsistema (donde 3 ≤ k ≤ 5).
+
+        El proceso se realiza en las siguientes fases:
+        1. Preparación del Subsistema:
+           - Reinicia el estado interno y las memorias de la estrategia.
+           - Construye el subsistema a partir de las cadenas de alcance y mecanismo y del estado inicial.
+        2. Manejo de Caso Trivial (Degenerado):
+           - Si la distribución marginal es uniforme/cero, retorna una partición trivial balanceada
+             con pérdida de información cero de manera inmediata.
+        3. Selección del Espacio de Búsqueda:
+           - Si el tamaño del sistema es muy pequeño (N <= 2) y la cantidad de combinaciones es acotada (<= 10,000),
+             ejecuta una búsqueda exhaustiva por fuerza bruta para garantizar optimalidad global.
+           - En caso contrario, genera un pool de candidatos mediante la jerarquía del árbol Q de fusiones
+             y cortes heurísticos estructurales, adaptando el tamaño del pool dinámicamente.
+        4. Búsqueda y Refinamiento Local:
+           - Evalúa los candidatos del pool para hallar el de menor pérdida EMD.
+           - Si se encuentra un candidato válido, aplica un refinamiento por Búsqueda Local (VND) con movimientos
+             simples y swaps para optimizar la frontera de corte.
+        5. Formateo de Resultados:
+           - Traduce los bloques a notación matricial y de matrices de alcance y mecanismo.
+           - Retorna el objeto Solution con el resultado detallado.
+
+        Args:
+            estado_inicial (str): Estado binario inicial de las variables del sistema (ej: "1011").
+            condicion (str): Configuración de las variables condicionadas.
+            alcance (str): Especificación de las variables que conforman el alcance futuro.
+            mecanismo (str): Especificación de las variables que conforman el mecanismo presente.
+            k (int, opcional): Número de bloques requeridos en la partición (por defecto es 3).
+
+        Returns:
+            Solution: Objeto Solution con la pérdida calculada, las distribuciones, el formato visual de la partición y el tiempo total.
+        """
         inicio = time.perf_counter()
         self.reset_estado()
         self.sia_preparar_subsistema(estado_inicial, condicion, alcance, mecanismo)
@@ -163,12 +230,12 @@ class KQNodes(QNodes):
         presente = [(ACTUAL, idx) for idx in self.sia_subsistema.dims_ncubos]
         futuro = [(EFFECT, idx) for idx in self.sia_subsistema.indices_ncubos]
 
-        # ── BÚSQUEDA EXHAUSTIVA O HEURÍSTICA SEGÚN TAMAÑO ─────────────────────
+        # ── BÚSQUEDA EXHAUSTIVA 
         n_nodos = len(self.sia_subsistema.indices_ncubos)
         n_pres = len(self.sia_subsistema.dims_ncubos)
         num_comb = stirling_segundo_tipo(n_nodos, k) * (k ** n_pres)
         
-        if k <= n_nodos <= 6 and num_comb <= 500:
+        if k <= n_nodos <= 8 and num_comb <= 10000:
             print(f"   [Exhaustivo] Ejecutando búsqueda exhaustiva para N={n_nodos} (futuro) y N_pres={n_pres} (presente) | Combinaciones: {num_comb} | k={k}...")
             best_blocks, best_loss, best_dist = self._ejecutar_busqueda_exhaustiva(k)
         else:
@@ -205,6 +272,34 @@ class KQNodes(QNodes):
     # ====================== ALGORITMO Q BASE ======================
     @profile(context={TYPE_TAG: QNODES_ANALYSIS_TAG})
     def algorithm(self, vertices: list[tuple[int, int]]):
+        """
+        Ejecuta el Algoritmo Q de fusiones jerárquicas sobre un conjunto de vértices (variables presentes y futuras).
+        Construye recursivamente un árbol de agrupamiento minimizando la ganancia local de información (función submodular).
+
+        El proceso se realiza en las siguientes fases:
+        1. Inicialización de Ciclos:
+           - Itera agrupando secuencialmente los elementos hasta consolidar un único grupo raíz.
+           - Para cada ciclo, separa los elementos en un conjunto inicial de exploración omega (omegas_ciclo)
+             y un conjunto de candidatos delta (deltas_ciclo).
+        2. Búsqueda Codiciosa (Greedy) del Siguiente Par:
+           - Evalúa el impacto de agregar cada candidato delta individual al conjunto omega usando la función submodular.
+           - Elige el delta que minimiza la ganancia incremental de pérdida (emd_union - emd_delta).
+           - Si la pérdida de delta es exactamente cero, interrumpe el agrupamiento y retorna el grupo actual.
+        3. Registro de Fusiones y Fusión de Grupos:
+           - Agrega el candidato elegido al conjunto omega del ciclo y lo remueve del conjunto delta.
+           - Al finalizar las evaluaciones internas, registra la fusión en fusion_history detallando el grupo izquierdo,
+             el grupo derecho y el grupo combinado.
+           - Actualiza la lista de vértices activos para el siguiente nivel del árbol jerárquico.
+        4. Selección de la Partición Candidata:
+           - Una vez completados todos los niveles, selecciona y retorna el grupo candidato del subsistema que
+             presenta la menor pérdida individual EMD registrada en memoria.
+
+        Args:
+            vertices (list[tuple[int, int]]): Lista de variables del subsistema, representadas por tuplas (tiempo, índice).
+
+        Returns:
+            tuple: La clave del grupo (tupla de variables) que representa la partición candidata de menor pérdida local.
+        """
         indice_emd = INT_ZERO
 
         for i in range(len(vertices) - 1):

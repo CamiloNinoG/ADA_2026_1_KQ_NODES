@@ -74,7 +74,7 @@ class BruteForce(SIA):
         self, estado_inicial: str, condiciones: str, alcance: str, mecanismo: str, k: int = 3
     ):
         self.sia_preparar_subsistema(estado_inicial, condiciones, alcance, mecanismo)
-        
+        print("K_BF##########")
         # Inicializadores idénticos a tu código base
         print(f"\n[🚀 K-Particiones] Iniciando búsqueda de MIP con k = {k}...")
         small_phi = np.inf
@@ -137,6 +137,15 @@ class BruteForce(SIA):
 
         # Limpieza de la línea dinámica al terminar el bucle
         print(f"\n🏁 Bucle finalizado de forma exitosa. Evaluaciones totales: {idx}")
+
+        if mejor_alcance_part is None:
+            # Caso degenerado cuando la cantidad de futuros es menor que k
+            mejor_alcance_part = [[idx] for idx in futuros]
+            while len(mejor_alcance_part) < k:
+                mejor_alcance_part.append([])
+            mejor_mecanismo_part = [[] for _ in range(k)]
+            if presentes:
+                mejor_mecanismo_part[0] = list(presentes)
 
         # Formateo dinámico usando la nueva función genérica
         solucion_base.perdida = small_phi

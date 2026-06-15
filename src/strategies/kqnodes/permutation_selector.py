@@ -9,16 +9,40 @@ from src.funcs.iit import emd_efecto
 
 def find_best_pairing(analizador, part_alcance: List[List[int]], part_mecanismo: List[List[int]], k: int) -> Tuple[List[List[Tuple[int, int]]], float]:
     """
-    Evalúa todas las k! permutaciones de part_mecanismo emparejadas con part_alcance.
-    Precalcula las k^2 distribuciones marginales usando la caché de biparticiones
-    para evaluar todas las permutaciones en memoria en microsegundos.
-    
-    Retorna (best_blocks, best_loss).
+    Evalúa todas las k! permutaciones de emparejamiento entre bloques de mecanismo (presente) 
+    y bloques de alcance (futuro) para encontrar la combinación que minimice la pérdida EMD.
+    Para garantizar alta velocidad, utiliza la caché de bloques individuales de forma que 
+    las permutaciones se evalúan instantáneamente en memoria en microsegundos sin hacer nuevos cálculos de EMD sobre el subsistema.
+
+    El proceso se realiza en dos fases principales:
+
+    1. Pre-cálculo e Indexación de Bloques (Fase Cache):
+       - Se evalúan las k^2 combinaciones posibles de emparejamiento (alcance_i con mecanismo_j) 
+         invocando la función 'bipartir_y_emd' (que a su vez utiliza la optimización Slice-First).
+       - Los vectores de distribución marginal obtenidos de cada bloque se almacenan temporalmente 
+         en una matriz de referencia de tamaño k x k.
+
+    2. Búsqueda y Selección del Emparejamiento Óptimo (Fase Permutaciones):
+       - Se recorren todas las k! permutaciones (de tamaño 120 para k=5) de asignación de bloques.
+       - Para cada permutación, se construye la distribución producto total hat_p en memoria 
+         reutilizando los vectores marginales pre-calculados, y se evalúa el costo EMD total 
+         comparándolo directamente contra las marginales del subsistema.
+       - Se seleccionan e instancian los bloques de variables (tiempo, índice) de la permutación que 
+         produjo la menor pérdida de información combinada.
+
+    Args:
+        analizador (KQNodes): Instancia del analizador que contiene la estructura del subsistema y variables de estado.
+        part_alcance (List[List[int]]): Partición del conjunto de alcance futuro del sistema en k bloques.
+        part_mecanismo (List[List[int]]): Partición del conjunto de mecanismo presente del sistema en k bloques.
+        k (int): Cantidad exacta de bloques permitidos para la partición.
+
+    Returns:
+        Tuple[List[List[Tuple[int, int]]], float]: Una tupla conteniendo:
+            - La lista de bloques de la mejor k-partición emparejada (cada bloque contiene tuplas (tiempo, índice)).
+            - El valor mínimo de pérdida EMD asociado a este emparejamiento óptimo.
     """
     indices_sistema = list(analizador.sia_subsistema.indices_ncubos)
     
-    # 1. Precalcular y cachear las k^2 combinaciones de bloques
-    # block_marginals[i][j] guarda el vector marginal para part_alcance[i] con part_mecanismo[j]
     block_marginals = [[None for _ in range(k)] for _ in range(k)]
     for i in range(k):
         alc = sorted(part_alcance[i])
@@ -27,7 +51,6 @@ def find_best_pairing(analizador, part_alcance: List[List[int]], part_mecanismo:
             _, dist = bipartir_y_emd(analizador, alc, mec, solo_emd=False)
             block_marginals[i][j] = dist
 
-    # 2. Evaluar todas las k! permutaciones de emparejamiento
     best_loss = INFTY_POS
     best_blocks = None
     
@@ -35,9 +58,7 @@ def find_best_pairing(analizador, part_alcance: List[List[int]], part_mecanismo:
     indices_presentes = sorted(set(idx for b in part_mecanismo for idx in b))
     map_actual = {idx: (ACTUAL, idx) for idx in indices_presentes}
 
-    # Iterar sobre las permutaciones del rango k
     for perm in itertools.permutations(range(k)):
-        # perm[i] es el índice del bloque de mecanismo emparejado con el bloque de alcance i
         hat_p = np.zeros(len(indices_sistema), dtype=np.float32)
         valid = True
         
@@ -46,7 +67,6 @@ def find_best_pairing(analizador, part_alcance: List[List[int]], part_mecanismo:
             if dist_bloque is None:
                 valid = False
                 break
-            # Copiar marginales a hat_p para las variables de este bloque alcance
             alc = part_alcance[i]
             for idx in alc:
                 if idx in indices_sistema:
@@ -56,11 +76,9 @@ def find_best_pairing(analizador, part_alcance: List[List[int]], part_mecanismo:
         if not valid:
             continue
             
-        # Calcular la pérdida EMD de la distribución producto reconstituida
         loss = emd_efecto(hat_p, analizador.sia_dists_marginales)
         if loss < best_loss:
             best_loss = loss
-            # Construir bloques finales (tiempo, índice)
             blocks = []
             for i in range(k):
                 bloque = [map_effect[idx] for idx in part_alcance[i] if idx in map_effect]
