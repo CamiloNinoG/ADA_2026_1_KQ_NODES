@@ -130,7 +130,7 @@ def ejecutar_con_tiempo(config_sistema, condiciones, alcance, mecanismo, resulta
             
 def resolver_tpm_path(estado_inicio: str) -> Path:
     """Find TPM file in common project locations based on state size."""
-    sample_name = f"N{len(estado_inicio)}A.csv"
+    sample_name = f"N{len(estado_inicio)}A.npy"
     candidates = (
         METHOD2_ROOT / "src" / ".samples" / sample_name,
         METHOD2_ROOT / ".samples" / sample_name,
@@ -146,14 +146,6 @@ def resolver_tpm_path(estado_inicio: str) -> Path:
 
 def inferir_estado_inicial(tamaño) -> str:
     """Infer an initial state from available datasets (prefers largest NxA.csv)."""
-    sample_dirs = (
-        METHOD2_ROOT / "src" / ".samples",
-        METHOD2_ROOT / ".samples",
-        GEOMIP_ROOT / "data" / "samples",
-    )
-    pattern = re.compile(r"N(\d+)[A-Z]\.csv$")
-
-    
     return "1" + ("0" * (tamaño - 1))
 
 
@@ -195,7 +187,7 @@ def ejecutar_desde_excel(
 
     tpm_path = resolver_tpm_path(estado_inicio)
     print(f"TPM cargada desde {tpm_path}")
-    tpm = np.genfromtxt(tpm_path, delimiter=",")
+    tpm = np.load(tpm_path,mmap_mode="r")
     cols = COLUMNAS[k]
     print(f"Procesando tmp cargada")
 
