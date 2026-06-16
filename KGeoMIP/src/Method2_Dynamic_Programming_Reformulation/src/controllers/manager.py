@@ -116,7 +116,7 @@ class Manager:
             str: El nombre del archivo generado.
         """
         np.random.seed(aplicacion.semilla_numpy)
-
+        print("hola")
         if dimensiones < 1:
             raise ValueError("Las dimensiones deben ser positivas")
 
@@ -134,14 +134,11 @@ class Manager:
             != "s"
         ):
             return
-        base_path = Path(__file__).resolve().parents[4] / SAMPLES_PATH
         # Verificar archivos existentes y generar nuevo nombre
-        base_path = Path(base_path )
-        print(f"Verificando existencia en {base_path}...")
-        base_path.mkdir(parents=True, exist_ok=True)
+        self.ruta_base.mkdir(parents=True, exist_ok=True)
 
         suffix = ABC_START
-        while (base_path / f"N{dimensiones}{suffix}.{CSV_EXTENSION}").exists():
+        while (self.ruta_base / f"N{dimensiones}{suffix}.{CSV_EXTENSION}").exists():
             if (
                 input(
                     f"Ya existe N{dimensiones}{suffix}.{CSV_EXTENSION}. ¿Generar nueva red? (s/n): "
@@ -152,7 +149,7 @@ class Manager:
             suffix = chr(ord(suffix) + 1)
 
         filename = f"N{dimensiones}{suffix}.{CSV_EXTENSION}"
-        filepath = base_path / filename
+        filepath = self.ruta_base / filename
 
         # Generar estados
         print("Generando estados...")
