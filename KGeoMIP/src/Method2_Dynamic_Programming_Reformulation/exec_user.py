@@ -3,7 +3,7 @@ import argparse
 from src.controllers.manager import Manager
 
 # 👇 Importación de estrategias 👇 #
-from KGeoMIP.src.Method2_Dynamic_Programming_Reformulation.src.controllers.strategies.KGeoMIP import KGeoMIP
+from src.controllers.strategies.KGeoMIP import KGeoMIP
 
 
 

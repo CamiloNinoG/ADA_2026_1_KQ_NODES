@@ -134,9 +134,10 @@ class Manager:
             != "s"
         ):
             return
-
+        base_path = Path(__file__).resolve().parents[4] / SAMPLES_PATH
         # Verificar archivos existentes y generar nuevo nombre
-        base_path = Path(SAMPLES_PATH)
+        base_path = Path(base_path )
+        print(f"Verificando existencia en {base_path}...")
         base_path.mkdir(parents=True, exist_ok=True)
 
         suffix = ABC_START

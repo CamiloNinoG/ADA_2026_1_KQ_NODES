@@ -125,7 +125,7 @@ def main():
                 "--tamano",
                 str(tamano_tpm),
             ],
-            cwd=ROOT / "GeoMIP" / "src" / "Method2_Dynamic_Programming_Reformulation"
+            cwd=ROOT / "KGeoMIP" / "src" / "Method2_Dynamic_Programming_Reformulation"
         )
     else:
         subprocess.run(
@@ -146,7 +146,7 @@ def main():
                 "--tamano",
                 str(tamano_tpm),
             ],
-            cwd=ROOT / "QNodes" 
+            cwd=ROOT / "KQNodes" 
         )
 
 if __name__ == "__main__":

@@ -39,7 +39,8 @@ ACTIVOS, INACTIVOS = True, False
 
 NET_LABEL: str = "NET"
 LOGS_PATH: str = ".logs"
-SAMPLES_PATH: str = "src/.samples/"
+SAMPLES_PATH: str = "data/samples"
+
 PROFILING_PATH: str = "review/profiling"
 RESOLVER_PATH: str = "review/resolver"
 
