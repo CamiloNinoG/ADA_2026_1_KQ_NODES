@@ -42,7 +42,7 @@ class System:
             )
             for i in range(n_nodes)
         )
-
+        
     @property
     def indices_ncubos(self):
         """

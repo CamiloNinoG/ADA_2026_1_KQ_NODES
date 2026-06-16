@@ -68,7 +68,7 @@ import traceback
 
 from openpyxl import load_workbook
 
-from src.controllers.strategies.k_geometric import KGeoMIPStrategy
+from KGeoMIP.src.Method2_Dynamic_Programming_Reformulation.src.controllers.strategies.KGeoMIP import KGeoMIP
 from src.controllers.manager import Manager
 from src.controllers.strategies.geometric import GeometricSIA
 # Optional import: this project often runs only geometric strategy.
@@ -101,7 +101,7 @@ def ejecutar_con_tiempo(config_sistema, condiciones, alcance, mecanismo, resulta
     print("mecanismo =", mecanismo)
     try:
 
-        analizador_fi = KGeoMIPStrategy(config_sistema)
+        analizador_fi = KGeoMIP(config_sistema)
 
         resultado = analizador_fi.aplicar_estrategia(
             condiciones,
@@ -130,7 +130,7 @@ def ejecutar_con_tiempo(config_sistema, condiciones, alcance, mecanismo, resulta
             
 def resolver_tpm_path(estado_inicio: str) -> Path:
     """Find TPM file in common project locations based on state size."""
-    sample_name = f"N{len(estado_inicio)}A.npy"
+    sample_name = f"N{len(estado_inicio)}A.csv"
     candidates = (
         METHOD2_ROOT / "src" / ".samples" / sample_name,
         METHOD2_ROOT / ".samples" / sample_name,
@@ -169,14 +169,14 @@ def ejecutar_desde_excel(
     print(f"Procesando hoja: {ws.title}")
 
     COLUMNAS = {
-        2: {"particion": "G", "perdida": "H", "tiempo": "I"},
-        3: {"particion": "M", "perdida": "N", "tiempo": "O"},
-        4: {"particion": "S", "perdida": "T", "tiempo": "U"},
-        5: {"particion": "Y", "perdida": "Z", "tiempo": "AA"},
+        2: {"particion": "K", "perdida": "L", "tiempo": "M"},
+        3: {"particion": "Q", "perdida": "R", "tiempo": "S"},
+        4: {"particion": "Z", "perdida": "AA", "tiempo": "AB"},
+        5: {"particion": "AI", "perdida": "AJ", "tiempo": "AK"},
 
     }
 
-    fila_inicio = 6 + inicio
+    fila_inicio = 7 + inicio
     fila_fin = min(ws.max_row, fila_inicio + cantidad - 1)
 
     estado_inicio = estado_inicio or inferir_estado_inicial(tamaño_estado)
@@ -187,14 +187,15 @@ def ejecutar_desde_excel(
 
     tpm_path = resolver_tpm_path(estado_inicio)
     print(f"TPM cargada desde {tpm_path}")
-    tpm = np.load(tpm_path,mmap_mode="r")
+    # tpm = np.load(tpm_path,mmap_mode="r")
+    tpm = np.genfromtxt(tpm_path, delimiter=",")
     cols = COLUMNAS[k]
     print(f"Procesando tmp cargada")
 
     for fila_excel in range(fila_inicio, fila_fin + 1):
 
-        alcance = ws[f"B{fila_excel}"].value
-        mecanismo = ws[f"C{fila_excel}"].value
+        alcance = ws[f"C{fila_excel}"].value
+        mecanismo = ws[f"D{fila_excel}"].value
         if alcance is None or mecanismo is None:
             continue
         print(f"Alcance: {alcance}, Mecanismo: {mecanismo}")
@@ -276,13 +277,13 @@ def iniciar():
         str(GEOMIP_ROOT / "results" / "DatosPruebas2026_1.xlsx"),
         )
     )
-    for k in range(2, 6):
+    for k in range(2, 3):
         ejecutar_desde_excel(
             ruta_excel=ruta_excel,
-            hoja=5,
+            hoja=8,
             k=k,
-            tamaño_estado=25,
-            cantidad=50
+            tamaño_estado=10,
+            cantidad=1
         )
 
 

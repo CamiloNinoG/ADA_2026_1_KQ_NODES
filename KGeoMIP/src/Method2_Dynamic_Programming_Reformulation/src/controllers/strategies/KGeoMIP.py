@@ -8,7 +8,7 @@ from src.constants.models import  KGEOMIP_LABEL
 from src.funcs.format import fmt_kparte_q
 
 
-class KGeoMIPStrategy(GeometricSIA):
+class KGeoMIP(GeometricSIA):
 
     def __init__(self, manager: Manager):
         super().__init__(manager)

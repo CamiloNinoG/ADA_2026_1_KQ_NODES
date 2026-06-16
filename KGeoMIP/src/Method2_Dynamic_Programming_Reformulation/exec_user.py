@@ -3,7 +3,7 @@ import argparse
 from src.controllers.manager import Manager
 
 # 👇 Importación de estrategias 👇 #
-from src.controllers.strategies.k_geometric import KGeoMIPStrategy
+from KGeoMIP.src.Method2_Dynamic_Programming_Reformulation.src.controllers.strategies.KGeoMIP import KGeoMIP
 
 
 
@@ -35,7 +35,7 @@ def main():
     
 
     ### Ejemplo de solución mediante módulo de fuerza bruta ###
-    analizador_bf : KGeoMIPStrategy = KGeoMIPStrategy(gestor_redes)
+    analizador_bf : KGeoMIP = KGeoMIP(gestor_redes)
 
     sia_cero = analizador_bf.aplicar_estrategia(
         args.condiciones,
